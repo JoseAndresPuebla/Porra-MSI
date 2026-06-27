@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
-import { useMatches, useAllPredictions, useTeams } from '../lib/hooks';
+import { useMatches, useAllPredictions, useTeams, usePointsConfig } from '../lib/hooks';
 import { db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { BRACKET_POSITIONS } from './AdminPanel';
@@ -11,9 +11,10 @@ export function MatchPredictions() {
   const { matches, loading } = useMatches();
   const { predictions } = useAllPredictions();
   const { teams } = useTeams();
+  const { pointsConfig, loading: configLoading } = usePointsConfig();
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
 
-  if (loading) return <div className="text-gray-400">Cargando partidos...</div>;
+  if (loading || configLoading) return <div className="text-gray-400">Cargando partidos...</div>;
 
   const playInMatches = matches.filter(m => m.phase === 'play-in');
   const mainStageMatches = matches.filter(m => m.phase === 'main-stage');
@@ -36,7 +37,7 @@ export function MatchPredictions() {
           <h3 className="text-xl font-bold text-white uppercase tracking-widest border-b border-dark-700 pb-2">Play-In</h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {playInMatches.map(match => (
-              <MatchCard key={match.id} match={match} userId={user?.userId} allPredictions={predictions} teams={teams} onClick={() => setSelectedMatch(match)} />
+              <MatchCard key={match.id} match={match} userId={user?.userId} allPredictions={predictions} teams={teams} pointsConfig={pointsConfig} onClick={() => setSelectedMatch(match)} />
             ))}
           </div>
         </div>
@@ -47,7 +48,7 @@ export function MatchPredictions() {
           <h3 className="text-xl font-bold text-white uppercase tracking-widest border-b border-dark-700 pb-2">Main Stage</h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {mainStageMatches.map(match => (
-              <MatchCard key={match.id} match={match} userId={user?.userId} allPredictions={predictions} teams={teams} onClick={() => setSelectedMatch(match)} />
+              <MatchCard key={match.id} match={match} userId={user?.userId} allPredictions={predictions} teams={teams} pointsConfig={pointsConfig} onClick={() => setSelectedMatch(match)} />
             ))}
           </div>
         </div>
@@ -65,12 +66,27 @@ export function MatchPredictions() {
   );
 }
 
-function MatchCard({ match, userId, allPredictions, teams, onClick }: any) {
+function MatchCard({ match, userId, allPredictions, teams, pointsConfig, onClick }: any) {
   const myPred = allPredictions.find((p: any) => p.userId === userId && p.matchId === match.id);
   const isCompleted = match.winner !== null && match.winner !== '';
   const myPredictedWinner = myPred?.predictedWinner;
-  const isCorrect = isCompleted && myPredictedWinner === match.winner;
-  const isWrong = isCompleted && myPredictedWinner && myPredictedWinner !== match.winner;
+  
+  let pointsEarned = 0;
+  if (isCompleted && myPred) {
+    if (myPredictedWinner === match.winner) {
+      pointsEarned += (pointsConfig.predictionCorrect ?? 10);
+    }
+    if (match.mapWins && myPred.mapWins) {
+      match.mapWins.forEach((winner: string, index: number) => {
+        if (myPred.mapWins && myPred.mapWins[index] === winner) {
+          pointsEarned += (pointsConfig.predictionMapCorrect ?? 2);
+        }
+      });
+    }
+  }
+
+  const isCorrect = isCompleted && pointsEarned > 0;
+  const isWrong = isCompleted && myPredictedWinner && pointsEarned === 0;
 
   const posInfo = BRACKET_POSITIONS[match.phase as 'play-in' | 'main-stage']?.find((p: any) => p.id === match.bracketPosition);
 
@@ -84,7 +100,7 @@ function MatchCard({ match, userId, allPredictions, teams, onClick }: any) {
     >
       {isCompleted && (
         <div className={`absolute top-0 right-0 px-3 py-1 text-xs font-bold uppercase rounded-bl-lg ${isCorrect ? 'bg-green-500/20 text-green-400' : isWrong ? 'bg-red-500/20 text-red-400' : 'bg-dark-700 text-gray-400'}`}>
-          {isCorrect ? '+10 Puntos' : isWrong ? 'Fallado' : 'Sin Predecir'}
+          {isCorrect ? `+${pointsEarned} Puntos` : isWrong ? 'Fallado' : 'Sin Predecir'}
         </div>
       )}
       <div className="mb-4">
@@ -201,25 +217,42 @@ function PredictionModal({ isOpen, onClose, match, userId, allPredictions, teams
           </div>
 
           <div className="space-y-3">
-             {Array.from({ length: mapsToShow }).map((_, i) => (
-                <div key={i} className="bg-dark-900/50 p-3 rounded-lg border border-dark-700">
-                   <div className="text-xs font-bold text-gray-400 mb-2 uppercase text-center tracking-wider">Mapa {i + 1}</div>
-                   <div className="flex gap-2">
-                      <button 
-                         onClick={() => handleSelectMap(i, match.team1)}
-                         className={`flex-1 py-2 font-bold rounded transition-all border ${mapWins[i] === match.team1 ? 'bg-gold-500 text-dark-900 border-gold-500' : 'bg-dark-800 text-gray-400 border-dark-600 hover:border-gold-500 hover:text-white'}`}
-                      >
-                         {match.team1}
-                      </button>
-                      <button 
-                         onClick={() => handleSelectMap(i, match.team2)}
-                         className={`flex-1 py-2 font-bold rounded transition-all border ${mapWins[i] === match.team2 ? 'bg-gold-500 text-dark-900 border-gold-500' : 'bg-dark-800 text-gray-400 border-dark-600 hover:border-gold-500 hover:text-white'}`}
-                      >
-                         {match.team2}
-                      </button>
-                   </div>
-                </div>
-             ))}
+             {Array.from({ length: mapsToShow }).map((_, i) => {
+                const mapIsCompleted = match.mapWins && match.mapWins[i];
+                const predictedMapWinner = mapWins[i];
+                const actualMapWinner = match.mapWins ? match.mapWins[i] : null;
+                const isMapCorrect = mapIsCompleted && predictedMapWinner === actualMapWinner;
+                const isMapWrong = mapIsCompleted && predictedMapWinner && predictedMapWinner !== actualMapWinner;
+                
+                return (
+                  <div key={i} className={`p-3 rounded-lg border ${isMapCorrect ? 'border-green-500 bg-green-500/10' : isMapWrong ? 'border-red-500 bg-red-500/10' : 'border-dark-700 bg-dark-900/50'}`}>
+                     <div className="flex justify-between items-center mb-2">
+                       <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mapa {i + 1}</div>
+                       {mapIsCompleted && (
+                         <div className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isMapCorrect ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                           {isMapCorrect ? 'Acertado' : 'Fallado'}
+                         </div>
+                       )}
+                     </div>
+                     <div className="flex gap-2">
+                        <button 
+                           onClick={() => !match.winner && handleSelectMap(i, match.team1)}
+                           disabled={!!match.winner}
+                           className={`flex-1 py-2 font-bold rounded transition-all border ${predictedMapWinner === match.team1 ? 'bg-gold-500 text-dark-900 border-gold-500' : 'bg-dark-800 text-gray-400 border-dark-600 hover:border-gold-500 hover:text-white'} disabled:cursor-default disabled:hover:border-dark-600 disabled:hover:text-gray-400`}
+                        >
+                           {match.team1} {actualMapWinner === match.team1 && '✓'}
+                        </button>
+                        <button 
+                           onClick={() => !match.winner && handleSelectMap(i, match.team2)}
+                           disabled={!!match.winner}
+                           className={`flex-1 py-2 font-bold rounded transition-all border ${predictedMapWinner === match.team2 ? 'bg-gold-500 text-dark-900 border-gold-500' : 'bg-dark-800 text-gray-400 border-dark-600 hover:border-gold-500 hover:text-white'} disabled:cursor-default disabled:hover:border-dark-600 disabled:hover:text-gray-400`}
+                        >
+                           {match.team2} {actualMapWinner === match.team2 && '✓'}
+                        </button>
+                     </div>
+                  </div>
+                );
+             })}
           </div>
         </div>
 

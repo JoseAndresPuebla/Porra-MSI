@@ -71,6 +71,37 @@ export function AdminPanel({ activeSection }: { activeSection: string }) {
 
   const [purging, setPurging] = useState(false);
   
+  const [filterTeam, setFilterTeam] = useState('all');
+  const [filterPosition, setFilterPosition] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+
+  const filteredPlayers = React.useMemo(() => {
+    return players.filter(p => {
+      if (filterTeam !== 'all' && p.teamId !== filterTeam) return false;
+      if (filterPosition !== 'all' && p.position !== filterPosition) return false;
+      return true;
+    }).sort((a, b) => {
+      const aStats = getPlayerSumFromMatches(a.id, matches);
+      const bStats = getPlayerSumFromMatches(b.id, matches);
+      const aK = (a.kills || 0) + aStats.kills;
+      const bK = (b.kills || 0) + bStats.kills;
+      const aD = (a.deaths || 0) + aStats.deaths;
+      const bD = (b.deaths || 0) + bStats.deaths;
+      const aA = (a.assists || 0) + aStats.assists;
+      const bA = (b.assists || 0) + bStats.assists;
+      const aCS = (a.cs || 0) + aStats.cs;
+      const bCS = (b.cs || 0) + bStats.cs;
+
+      switch (sortBy) {
+        case 'kills': return bK - aK;
+        case 'deaths': return bD - aD;
+        case 'assists': return bA - aA;
+        case 'cs': return bCS - aCS;
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+  }, [players, matches, filterTeam, filterPosition, sortBy]);
+
   const [alertInfo, setAlertInfo] = useState<{isOpen: boolean, title: string, message: string, type: 'success'|'error'}>({
     isOpen: false, title: '', message: '', type: 'success'
   });
@@ -206,6 +237,23 @@ export function AdminPanel({ activeSection }: { activeSection: string }) {
                </button>
              )}
           </div>
+          <div className="flex flex-wrap gap-4 py-2">
+            <select value={filterTeam} onChange={e => setFilterTeam(e.target.value)} className="bg-dark-900 border border-dark-700 rounded px-3 py-1.5 text-sm text-white">
+              <option value="all">Todos los Equipos</option>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <select value={filterPosition} onChange={e => setFilterPosition(e.target.value)} className="bg-dark-900 border border-dark-700 rounded px-3 py-1.5 text-sm text-white">
+              <option value="all">Todas las Posiciones</option>
+              {['Top', 'Jungle', 'Mid', 'ADC', 'Support', 'Coach'].map(pos => <option key={pos} value={pos}>{pos}</option>)}
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="bg-dark-900 border border-dark-700 rounded px-3 py-1.5 text-sm text-white">
+              <option value="name">Ordenar por Nombre</option>
+              <option value="kills">Ordenar por Kills</option>
+              <option value="deaths">Ordenar por Deaths</option>
+              <option value="assists">Ordenar por Assists</option>
+              <option value="cs">Ordenar por CS</option>
+            </select>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-dark-700 bg-dark-800">
             <table className="w-full text-left text-sm text-gray-300">
               <thead className="bg-dark-900 text-xs uppercase">
@@ -219,11 +267,11 @@ export function AdminPanel({ activeSection }: { activeSection: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-700">
-                {players.map(p => (
+                {filteredPlayers.map(p => (
                   <PlayerStatRow key={p.id} player={p} teams={teams} matches={matches} showAlert={showAlert} showConfirm={showConfirm} onEdit={() => openEditPlayer(p)} />
                 ))}
-                {players.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">No hay jugadores registrados.</td></tr>
+                {filteredPlayers.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-500">No hay jugadores que coincidan con los filtros.</td></tr>
                 )}
               </tbody>
             </table>
@@ -951,7 +999,15 @@ function PointsConfigSection({ showAlert }: { showAlert: any }) {
 
         {/* Coach y Favorito */}
         <div className="border border-dark-700 bg-dark-800 p-5 rounded-xl space-y-4">
-           <h4 className="font-bold text-gold-400 border-b border-dark-700 pb-2">Coach y Equipo Favorito</h4>
+           <h4 className="font-bold text-gold-400 border-b border-dark-700 pb-2">Coach, Equipo Favorito y Predicciones</h4>
+           <div>
+              <label className="block text-sm text-gray-400 mb-1">Predicción Correcta (Puntos por Acertar Ganador)</label>
+              <input type="number" step="1" value={localConfig.predictionCorrect ?? 10} onChange={e => handleChange('predictionCorrect', e.target.value)} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white" />
+           </div>
+           <div>
+              <label className="block text-sm text-gray-400 mb-1">Predicción de Mapa Correcto (Puntos por acertar resultado en un mapa específico)</label>
+              <input type="number" step="1" value={localConfig.predictionMapCorrect ?? 2} onChange={e => handleChange('predictionMapCorrect', e.target.value)} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white" />
+           </div>
            <div>
               <label className="block text-sm text-gray-400 mb-1">Coach: Por Mapa Ganado</label>
               <input type="number" step="1" value={localConfig.coachMapWin} onChange={e => handleChange('coachMapWin', e.target.value)} className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-white" />

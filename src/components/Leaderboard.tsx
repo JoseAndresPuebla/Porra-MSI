@@ -71,8 +71,17 @@ export function Leaderboard() {
       const userPredictions = predictions.filter(p => p.userId === user.userId);
       userPredictions.forEach(pred => {
         const match = matches.find(m => m.id === pred.matchId);
-        if (match && match.winner && match.winner === pred.predictedWinner) {
-          score += 10; // 10 points for correct prediction
+        if (match) {
+          if (match.winner && match.winner === pred.predictedWinner) {
+            score += (pointsConfig.predictionCorrect ?? 10);
+          }
+          if (match.mapWins && pred.mapWins) {
+            match.mapWins.forEach((winner, index) => {
+              if (pred.mapWins && pred.mapWins[index] === winner) {
+                score += (pointsConfig.predictionMapCorrect ?? 2);
+              }
+            });
+          }
         }
       });
 

@@ -62,5 +62,8 @@ export interface Prediction {
   userId: string;
   matchId: string;
   predictedWinner: string;
+  mapWins?: string[];
+  team1Score?: number;
+  team2Score?: number;
   updatedAt: number;
 }

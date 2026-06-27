@@ -127,6 +127,8 @@ export const DEFAULT_POINTS_CONFIG = {
   coachMapWin: 15,
   coachMapLoss: -5,
   favoriteTeamMapWin: 15,
+  predictionCorrect: 10,
+  predictionMapCorrect: 2,
   assassin1Kill: 3,
   assassin2Kill: 2,
   assassin3Kill: 1,
