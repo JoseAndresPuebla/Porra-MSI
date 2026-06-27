@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn(); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'displayName', 'photoURL']) &&
+             data.keys().size() == 3 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() <= 128 &&
+             data.photoURL is string && data.photoURL.size() <= 500;
+    }
+
+    function isValidRoster(data) {
+      return data.keys().hasAll(['userId', 'top', 'jgl', 'mid', 'adc', 'sup', 'updatedAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.top is string && data.top.size() <= 128 &&
+             data.jgl is string && data.jgl.size() <= 128 &&
+             data.mid is string && data.mid.size() <= 128 &&
+             data.adc is string && data.adc.size() <= 128 &&
+             data.sup is string && data.sup.size() <= 128 &&
+             (data.keys().hasAny(['coach']) == false || (data.coach is string && data.coach.size() <= 128)) &&
+             (data.keys().hasAny(['assassin1']) == false || (data.assassin1 is string && data.assassin1.size() <= 128)) &&
+             (data.keys().hasAny(['assassin2']) == false || (data.assassin2 is string && data.assassin2.size() <= 128)) &&
+             (data.keys().hasAny(['assassin3']) == false || (data.assassin3 is string && data.assassin3.size() <= 128)) &&
+             data.updatedAt is number;
+    }
+
+    function isValidPrediction(data) {
+       return data.keys().hasAll(['userId', 'matchId', 'predictedWinner', 'updatedAt']) &&
+              data.userId is string && data.userId.size() <= 128 &&
+              data.matchId is string && data.matchId.size() <= 128 &&
+              data.predictedWinner is string && data.predictedWinner.size() <= 128 &&
+              (data.keys().hasAny(['mapWins']) == false || (data.mapWins is list && data.mapWins.size() <= 5)) &&
+              (data.keys().hasAny(['team1Score']) == false || data.team1Score is number) &&
+              (data.keys().hasAny(['team2Score']) == false || data.team2Score is number) &&
+              data.updatedAt is number;
+    }
+
+    function isValidPlayer(data) {
+      return data.keys().hasAll(['id', 'name', 'teamId', 'position', 'kills', 'deaths', 'assists', 'cs']) &&
+             data.keys().size() == 8 &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.teamId is string && data.teamId.size() <= 128 &&
+             data.position is string && data.position.size() <= 50 &&
+             data.kills is number &&
+             data.deaths is number &&
+             data.assists is number &&
+             data.cs is number;
+    }
+
+    function isValidTeam(data) {
+      return data.keys().hasAll(['id', 'name', 'acronym', 'region']) &&
+             data.keys().size() == 4 &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.acronym is string && data.acronym.size() <= 20 &&
+             data.region is string && data.region.size() <= 128;
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['id', 'phase', 'bracketPosition', 'team1', 'team2', 'winner']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.phase in ['play-in', 'main-stage'] &&
+             data.bracketPosition is string && data.bracketPosition.size() <= 64 &&
+             data.team1 is string && data.team1.size() <= 128 &&
+             data.team2 is string && data.team2.size() <= 128 &&
+             (data.winner is string || data.winner == null) &&
+             (data.keys().hasAny(['mapWins']) == false || (data.mapWins is list && data.mapWins.size() <= 5)) &&
+             (data.keys().hasAny(['team1Score']) == false || data.team1Score is number) &&
+             (data.keys().hasAny(['team2Score']) == false || data.team2Score is number) &&
+             (data.keys().hasAny(['playerStats']) == false || data.playerStats is map);
+    }
+
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+    }
+
+    match /rosters/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidRoster(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && userId == request.auth.uid && isValidRoster(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['top', 'jgl', 'mid', 'adc', 'sup', 'coach', 'assassin1', 'assassin2', 'assassin3', 'updatedAt']);
+    }
+
+    match /predictions/{predictionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isValidId(predictionId) && isValidPrediction(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidPrediction(incoming()) && incoming().userId == existing().userId && incoming().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['predictedWinner', 'mapWins', 'team1Score', 'team2Score', 'updatedAt']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /players/{playerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /phases/{phaseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

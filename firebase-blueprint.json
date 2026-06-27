@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Participant",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["userId", "displayName", "photoURL"]
+    },
+    "Roster": {
+      "title": "Roster",
+      "description": "The user's selected 5 players.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "top": { "type": "string" },
+        "jgl": { "type": "string" },
+        "mid": { "type": "string" },
+        "adc": { "type": "string" },
+        "sup": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "top", "jgl", "mid", "adc", "sup", "updatedAt"]
+    },
+    "Prediction": {
+      "title": "Prediction",
+      "description": "Prediction for a specific match.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "matchId": { "type": "string" },
+        "predictedWinner": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "matchId", "predictedWinner", "updatedAt"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "A player in the tournament.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "teamId": { "type": "string" },
+        "position": { "type": "string" },
+        "kills": { "type": "number" },
+        "deaths": { "type": "number" },
+        "assists": { "type": "number" },
+        "cs": { "type": "number" }
+      },
+      "required": ["id", "name", "teamId", "position", "kills", "deaths", "assists", "cs"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A tournament match.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phaseId": { "type": "string" },
+        "team1": { "type": "string" },
+        "team2": { "type": "string" },
+        "winner": { "type": "string" }
+      },
+      "required": ["id", "phaseId", "team1", "team2", "winner"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "A team in the tournament.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "acronym": { "type": "string" },
+        "region": { "type": "string" }
+      },
+      "required": ["id", "name", "acronym", "region"]
+    },
+    "Phase": {
+      "title": "Phase",
+      "description": "A tournament phase.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "name", "order"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+       "schema": { "$ref": "#/entities/User" },
+       "description": "Stores users"
+    },
+    "/rosters/{userId}": {
+       "schema": { "$ref": "#/entities/Roster" },
+       "description": "Stores user rosters"
+    },
+    "/predictions/{predictionId}": {
+       "schema": { "$ref": "#/entities/Prediction" },
+       "description": "Stores predictions"
+    },
+    "/players/{playerId}": {
+       "schema": { "$ref": "#/entities/Player" },
+       "description": "Stores tournament players"
+    },
+    "/teams/{teamId}": {
+       "schema": { "$ref": "#/entities/Team" },
+       "description": "Stores tournament teams"
+    },
+    "/matches/{matchId}": {
+       "schema": { "$ref": "#/entities/Match" },
+       "description": "Stores tournament matches"
+    },
+    "/phases/{phaseId}": {
+       "schema": { "$ref": "#/entities/Phase" },
+       "description": "Stores tournament phases"
+    }
+  }
+}
