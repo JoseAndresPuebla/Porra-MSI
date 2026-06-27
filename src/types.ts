@@ -2,6 +2,7 @@ export interface User {
   userId: string;
   displayName: string;
   photoURL: string;
+  isAdmin?: boolean;
 }
 
 export interface Player {

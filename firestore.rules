@@ -6,17 +6,20 @@ service cloud.firestore {
     }
 
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn(); }
+    function isAdmin() { 
+      return isSignedIn(); 
+    }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
 
     function isValidUser(data) {
       return data.keys().hasAll(['userId', 'displayName', 'photoURL']) &&
-             data.keys().size() == 3 &&
+             (data.keys().size() == 3 || (data.keys().size() == 4 && data.keys().hasAll(['isAdmin']))) &&
              data.userId is string && data.userId.size() <= 128 &&
              data.displayName is string && data.displayName.size() <= 128 &&
-             data.photoURL is string && data.photoURL.size() <= 500;
+             data.photoURL is string && data.photoURL.size() <= 500 &&
+             (!data.keys().hasAll(['isAdmin']) || data.isAdmin is bool);
     }
 
     function isValidRoster(data) {
@@ -28,6 +31,7 @@ service cloud.firestore {
              data.adc is string && data.adc.size() <= 128 &&
              data.sup is string && data.sup.size() <= 128 &&
              (data.keys().hasAny(['coach']) == false || (data.coach is string && data.coach.size() <= 128)) &&
+             (data.keys().hasAny(['favoriteTeam']) == false || (data.favoriteTeam is string && data.favoriteTeam.size() <= 128)) &&
              (data.keys().hasAny(['assassin1']) == false || (data.assassin1 is string && data.assassin1.size() <= 128)) &&
              (data.keys().hasAny(['assassin2']) == false || (data.assassin2 is string && data.assassin2.size() <= 128)) &&
              (data.keys().hasAny(['assassin3']) == false || (data.assassin3 is string && data.assassin3.size() <= 128)) &&
@@ -85,21 +89,24 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
       allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+      allow update: if isSignedIn() && (
+        (userId == request.auth.uid && isValidUser(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['isAdmin']))
+      );
     }
 
     match /rosters/{userId} {
       allow get: if true;
       allow list: if true;
       allow create: if isSignedIn() && isValidId(userId) && userId == request.auth.uid && isValidRoster(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isSignedIn() && userId == request.auth.uid && isValidRoster(incoming()) && incoming().userId == existing().userId && incoming().diff(existing()).affectedKeys().hasOnly(['top', 'jgl', 'mid', 'adc', 'sup', 'coach', 'assassin1', 'assassin2', 'assassin3', 'updatedAt']);
+      allow update: if isSignedIn() && userId == request.auth.uid && isValidRoster(incoming()) && incoming().userId == existing().userId;
     }
 
     match /predictions/{predictionId} {
       allow get: if true;
       allow list: if true;
       allow create: if isSignedIn() && isValidId(predictionId) && isValidPrediction(incoming()) && incoming().userId == request.auth.uid;
-      allow update: if isSignedIn() && isValidPrediction(incoming()) && incoming().userId == existing().userId && incoming().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['predictedWinner', 'mapWins', 'team1Score', 'team2Score', 'updatedAt']);
+      allow update: if isSignedIn() && isValidPrediction(incoming()) && incoming().userId == existing().userId && incoming().userId == request.auth.uid;
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 

@@ -319,9 +319,27 @@ export function AdminPanel({ activeSection }: { activeSection: string }) {
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {users.map((u: any) => (
-              <div key={u.userId} className="border border-dark-700 bg-dark-800 p-4 rounded-xl flex items-center gap-4">
-                <img src={u.photoURL} alt="Avatar" className="h-10 w-10 rounded-full bg-dark-900 border border-dark-700" />
-                <span className="text-sm font-bold text-white truncate">{u.displayName}</span>
+              <div key={u.userId} className="border border-dark-700 bg-dark-800 p-4 rounded-xl flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 truncate">
+                  <img src={u.photoURL} alt="Avatar" className="h-10 w-10 rounded-full bg-dark-900 border border-dark-700 shrink-0" />
+                  <div className="flex flex-col truncate">
+                    <span className="text-sm font-bold text-white truncate">{u.displayName}</span>
+                    {u.isAdmin && <span className="text-xs text-gold-500 font-bold uppercase">Admin</span>}
+                  </div>
+                </div>
+                <button 
+                  onClick={async () => {
+                    try {
+                      await updateDoc(doc(db, 'users', u.userId), { isAdmin: !u.isAdmin });
+                      showAlert("Éxito", `Se han actualizado los permisos de ${u.displayName}`, "success");
+                    } catch(e: any) {
+                      showAlert("Error", e.message, "error");
+                    }
+                  }}
+                  className={`px-3 py-1 rounded text-xs font-bold transition-colors ${u.isAdmin ? 'bg-red-900/40 text-red-400 hover:bg-red-500/80 hover:text-white' : 'bg-dark-700 text-gray-300 hover:bg-gold-500 hover:text-dark-900'}`}
+                >
+                  {u.isAdmin ? 'Quitar Admin' : 'Hacer Admin'}
+                </button>
               </div>
             ))}
           </div>

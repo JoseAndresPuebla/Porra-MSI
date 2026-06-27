@@ -52,25 +52,30 @@ export function RosterManager() {
     if (!user) return;
     setSaving(true);
     try {
-      const currentRoster = rosters.find(r => r.userId === user.userId) || { userId: user.userId };
-      const newRoster = {
-        ...currentRoster,
-        top: selectedTop,
-        jgl: selectedJgl,
-        mid: selectedMid,
-        adc: selectedAdc,
-        sup: selectedSup,
-        coach: selectedCoach,
-        favoriteTeam: favoriteTeam,
-        assassin1: assassin1,
-        assassin2: assassin2,
-        assassin3: assassin3,
-        updatedAt: Date.now(),
-        ...updates
-      };
-      await setDoc(doc(db, 'rosters', user.userId), newRoster);
-    } catch (e) {
+      const currentRoster = rosters.find(r => r.userId === user.userId);
+      if (!currentRoster) {
+        const newRoster = {
+          userId: user.userId,
+          top: selectedTop,
+          jgl: selectedJgl,
+          mid: selectedMid,
+          adc: selectedAdc,
+          sup: selectedSup,
+          coach: selectedCoach,
+          favoriteTeam: favoriteTeam,
+          assassin1: assassin1,
+          assassin2: assassin2,
+          assassin3: assassin3,
+          updatedAt: Date.now(),
+          ...updates
+        };
+        await setDoc(doc(db, 'rosters', user.userId), newRoster);
+      } else {
+        await setDoc(doc(db, 'rosters', user.userId), { ...updates, updatedAt: Date.now() }, { merge: true });
+      }
+    } catch (e: any) {
       console.error(e);
+      alert("Error al guardar: " + e.message);
     } finally {
       setSaving(false);
     }
